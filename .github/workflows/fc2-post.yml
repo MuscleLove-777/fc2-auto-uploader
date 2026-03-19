@@ -1,0 +1,39 @@
+name: FC2 Blog Auto Post
+
+on:
+  schedule:
+    - cron: '30 0 * * *'   # 09:30 JST
+    - cron: '0 5 * * *'    # 14:00 JST
+    - cron: '30 12 * * *'  # 21:30 JST
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run upload
+        env:
+          FC2_BLOG_ID: ${{ secrets.FC2_BLOG_ID }}
+          FC2_USERNAME: ${{ secrets.FC2_USERNAME }}
+          FC2_PASSWORD: ${{ secrets.FC2_PASSWORD }}
+          GDRIVE_FOLDER_ID_FC2: ${{ secrets.GDRIVE_FOLDER_ID_FC2 }}
+        run: python upload.py
+
+      - name: Commit upload log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add uploaded_fc2.json
+          git diff --staged --quiet || git commit -m "Update uploaded_fc2.json"
+          git push
