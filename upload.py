@@ -7,6 +7,7 @@ import sys
 import json
 import os
 import random
+import time
 import xmlrpc.client
 from datetime import datetime, timezone, timedelta
 
@@ -183,15 +184,69 @@ def build_body(image_url, title, tags):
 
 # ===== FC2 Blog XML-RPC =====
 
+XMLRPC_TIMEOUT = 120  # seconds
+XMLRPC_MAX_RETRIES = 5
+XMLRPC_RETRY_DELAYS = [10, 30, 60, 90, 120]  # seconds between retries
+
+
+class TimeoutTransport(xmlrpc.client.Transport):
+    """XML-RPC Transport with configurable timeout"""
+    def __init__(self, timeout=XMLRPC_TIMEOUT, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.timeout = timeout
+
+    def make_connection(self, host):
+        conn = super().make_connection(host)
+        conn.timeout = self.timeout
+        return conn
+
+
+class TimeoutSafeTransport(xmlrpc.client.SafeTransport):
+    """XML-RPC SafeTransport (HTTPS) with configurable timeout"""
+    def __init__(self, timeout=XMLRPC_TIMEOUT, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.timeout = timeout
+
+    def make_connection(self, host):
+        conn = super().make_connection(host)
+        conn.timeout = self.timeout
+        return conn
+
+
 def get_fc2_client():
-    """FC2 Blog XML-RPCクライアントを作成"""
-    return xmlrpc.client.ServerProxy(FC2_XMLRPC_ENDPOINT)
+    """FC2 Blog XML-RPCクライアントを作成（タイムアウト付き）"""
+    transport = TimeoutSafeTransport(timeout=XMLRPC_TIMEOUT)
+    return xmlrpc.client.ServerProxy(FC2_XMLRPC_ENDPOINT, transport=transport)
+
+
+def xmlrpc_call_with_retry(func, *args, max_retries=XMLRPC_MAX_RETRIES, delays=None):
+    """XML-RPC呼び出しをリトライ付きで実行"""
+    if delays is None:
+        delays = XMLRPC_RETRY_DELAYS
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            return func(*args)
+        except xmlrpc.client.Fault:
+            raise  # API-level errors should not be retried
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait = delays[min(attempt, len(delays) - 1)]
+                print(f"  Connection error (attempt {attempt + 1}/{max_retries}): {e}")
+                print(f"  Retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                print(f"  All {max_retries} attempts failed: {e}")
+    raise last_error
 
 
 def verify_credentials(client):
-    """認証情報を確認"""
+    """認証情報を確認（リトライ付き）"""
     try:
-        blogs = client.blogger.getUsersBlogs("fc2", FC2_USERNAME, FC2_PASSWORD)
+        blogs = xmlrpc_call_with_retry(
+            client.blogger.getUsersBlogs, "fc2", FC2_USERNAME, FC2_PASSWORD
+        )
         if blogs:
             print(f"Auth OK: Blog ID = {blogs[0].get('blogid', 'unknown')}")
             print(f"Blog name: {blogs[0].get('blogName', 'unknown')}")
@@ -231,7 +286,8 @@ def upload_image_to_fc2(client, image_path):
     }
 
     print(f"Uploading image: {fname} ({mime_type}, {len(image_data)} bytes)")
-    result = client.metaWeblog.newMediaObject(
+    result = xmlrpc_call_with_retry(
+        client.metaWeblog.newMediaObject,
         FC2_BLOG_ID, FC2_USERNAME, FC2_PASSWORD, media_struct
     )
     image_url = result.get('url', '')
@@ -249,7 +305,8 @@ def create_blog_post(client, title, body, tags, publish=True):
     }
 
     print(f"Creating post: {title}")
-    post_id = client.metaWeblog.newPost(
+    post_id = xmlrpc_call_with_retry(
+        client.metaWeblog.newPost,
         FC2_BLOG_ID, FC2_USERNAME, FC2_PASSWORD, post_struct, publish
     )
     print(f"Post created! ID: {post_id}")
