@@ -200,9 +200,9 @@ def build_body(image_url, title, tags):
 
 # ===== FC2 Blog XML-RPC =====
 
-XMLRPC_TIMEOUT = 120  # seconds
-XMLRPC_MAX_RETRIES = 5
-XMLRPC_RETRY_DELAYS = [10, 30, 60, 90, 120]  # seconds between retries
+XMLRPC_TIMEOUT = 300  # seconds
+XMLRPC_MAX_RETRIES = 7
+XMLRPC_RETRY_DELAYS = [10, 30, 60, 90, 120, 180, 240]  # seconds between retries
 
 
 class TimeoutTransport(xmlrpc.client.Transport):
@@ -367,7 +367,9 @@ def main():
     # FC2 Blog接続
     client = get_fc2_client()
     if not verify_credentials(client):
-        return 1
+        # タイムアウトの場合は警告を出しつつ続行（直接アップロードを試みる）
+        print("WARNING: verify_credentials failed, but attempting upload anyway (timeout may be transient)")
+        print("Continuing with direct upload attempt...")
 
     # Google Driveから画像ダウンロード
     images = download_images()

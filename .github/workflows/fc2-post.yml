@@ -25,7 +25,38 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run upload
+      - name: Run upload (attempt 1)
+        id: attempt1
+        continue-on-error: true
+        env:
+          FC2_BLOG_ID: ${{ secrets.FC2_BLOG_ID }}
+          FC2_USERNAME: ${{ secrets.FC2_USERNAME }}
+          FC2_PASSWORD: ${{ secrets.FC2_PASSWORD }}
+          GDRIVE_FOLDER_ID_FC2: ${{ secrets.GDRIVE_FOLDER_ID_FC2 }}
+        run: python upload.py
+
+      - name: Wait before retry 2
+        if: steps.attempt1.outcome == 'failure'
+        run: echo "Attempt 1 failed. Waiting 60s..." && sleep 60
+
+      - name: Run upload (attempt 2)
+        id: attempt2
+        if: steps.attempt1.outcome == 'failure'
+        continue-on-error: true
+        env:
+          FC2_BLOG_ID: ${{ secrets.FC2_BLOG_ID }}
+          FC2_USERNAME: ${{ secrets.FC2_USERNAME }}
+          FC2_PASSWORD: ${{ secrets.FC2_PASSWORD }}
+          GDRIVE_FOLDER_ID_FC2: ${{ secrets.GDRIVE_FOLDER_ID_FC2 }}
+        run: python upload.py
+
+      - name: Wait before retry 3
+        if: steps.attempt1.outcome == 'failure' && steps.attempt2.outcome == 'failure'
+        run: echo "Attempt 2 failed. Waiting 120s..." && sleep 120
+
+      - name: Run upload (attempt 3)
+        id: attempt3
+        if: steps.attempt1.outcome == 'failure' && steps.attempt2.outcome == 'failure'
         env:
           FC2_BLOG_ID: ${{ secrets.FC2_BLOG_ID }}
           FC2_USERNAME: ${{ secrets.FC2_USERNAME }}
@@ -34,6 +65,7 @@ jobs:
         run: python upload.py
 
       - name: Commit upload log
+        if: steps.attempt1.outcome == 'success' || steps.attempt2.outcome == 'success' || steps.attempt3.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
