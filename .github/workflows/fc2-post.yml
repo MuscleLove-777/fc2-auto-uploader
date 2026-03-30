@@ -2,9 +2,8 @@ name: FC2 Blog Auto Post
 
 on:
   schedule:
-    - cron: '30 0 * * *'   # 09:30 JST
-    - cron: '0 5 * * *'    # 14:00 JST
-    - cron: '30 12 * * *'  # 21:30 JST
+    # 毎日 JST 12:00 (UTC 3:00)
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions:
