@@ -2,8 +2,10 @@ name: FC2 Blog Auto Post
 
 on:
   schedule:
-    # 毎日 JST 12:00 (UTC 3:00)
-    - cron: '0 3 * * *'
+    # Wave6-C 頻度UP (規約配慮で間隔分散、ameblo UTC 3/9/13 とは衝突なし)
+    - cron: '0 6 * * *'  # JST 15:00
+    - cron: '0 12 * * *'  # JST 21:00
+    - cron: '0 18 * * *'  # JST 03:00
   workflow_dispatch:
 
 permissions:
