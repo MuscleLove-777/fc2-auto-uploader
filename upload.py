@@ -22,9 +22,38 @@ FC2_PASSWORD = os.environ.get("FC2_PASSWORD", "")
 GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID_FC2", "")
 
 FC2_XMLRPC_ENDPOINT = "https://blog.fc2.com/xmlrpc.php"
-PATREON_LINK = "https://www.patreon.com/cw/MuscleLove"
+PATREON_LINK = "https://www.patreon.com/cw/MuscleLove?utm_source=fc2"
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 UPLOADED_LOG = "uploaded_fc2.json"
+
+# --- MuscleLove バックリンクプール（FC2はadult OKだがフィットネス系で安全運転） ---
+ML_BACKLINK_POOL_FITNESS = [
+    ("https://musclelove-777.github.io/muscle-meal-girls/", "筋肉女子のマッスルメシ"),
+    ("https://musclelove-777.github.io/runners-lab/", "ランナーラボ"),
+    ("https://musclelove-777.github.io/armwrestling-girls-navi/", "腕相撲女子ナビ"),
+    ("https://musclelove-777.github.io/physique-girls-navi/", "フィジーク女子ナビ"),
+    ("https://musclelove-777.github.io/fighting-girls-navi/", "格闘技女子ナビ"),
+    ("https://musclelove-777.github.io/joshi-prowrestling-navi/", "女子プロレスナビ"),
+    ("https://musclelove-777.github.io/female-physique-queens/", "Female Physique Queens"),
+    ("https://musclelove-777.github.io/network/fitness/", "Fitness Network 15サイト"),
+    ("https://musclelove-777.github.io/network/academy/", "MuscleLove Academy 77"),
+]
+
+
+def build_backlink_block():
+    """MuscleLoveバックリンクHTMLブロック（ランダム3件、冪等マーカー付き）"""
+    try:
+        k = min(3, len(ML_BACKLINK_POOL_FITNESS))
+        selected = random.sample(ML_BACKLINK_POOL_FITNESS, k=k)
+        items = " | ".join([f'<a href="{u}" target="_blank" rel="noopener">{n}</a>' for u, n in selected])
+        return (
+            "\n<br/><br/>\n"
+            "<!-- ML_BACKLINK -->\n"
+            f'<small style="color:#888;">💡 関連サイト：{items}</small>\n'
+            "<!-- /ML_BACKLINK -->\n"
+        )
+    except Exception:
+        return ""
 
 # --- タグマッピング ---
 CONTENT_TAG_MAP = {
@@ -196,13 +225,14 @@ def build_body(image_url, title, tags):
     description = random.choice(DESCRIPTION_TEMPLATES)
     hashtags = ' '.join([f'#{t}' for t in tags[:15]])
     template = random.choice(BODY_TEMPLATES)
-    return template.format(
+    body = template.format(
         image_url=image_url,
         title=title,
         description=description,
         hashtags=hashtags,
         patreon_link=PATREON_LINK,
     )
+    return body.rstrip() + build_backlink_block()
 
 
 # ===== FC2 Blog XML-RPC =====
