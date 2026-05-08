@@ -22,7 +22,7 @@ FC2_PASSWORD = os.environ.get("FC2_PASSWORD", "")
 GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID_FC2", "")
 
 FC2_XMLRPC_ENDPOINT = "https://blog.fc2.com/xmlrpc.php"
-PATREON_LINK = "https://www.patreon.com/cw/MuscleLove?utm_source=fc2"
+PATREON_LINK = "https://www.patreon.com/c/MuscleLove?utm_source=fc2"
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 UPLOADED_LOG = "uploaded_fc2.json"
 
