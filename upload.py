@@ -3,15 +3,29 @@
 FC2 Blog 画像自動アップロード（GitHub Actions用）
 Google Driveから画像取得 → FC2 BlogにXML-RPC (MetaWeblog API) で投稿
 """
+import argparse
+import html
 import sys
 import json
 import os
 import random
+import re
 import time
 import xmlrpc.client
 from datetime import datetime, timezone, timedelta
 
-import gdown
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
+try:
+    import gdown
+except ImportError:
+    gdown = None
+try:
+    from pool_loader import as_insights
+except Exception:
+    as_insights = None
 
 JST = timezone(timedelta(hours=9))
 
@@ -25,6 +39,11 @@ FC2_XMLRPC_ENDPOINT = "https://blog.fc2.com/xmlrpc.php"
 PATREON_LINK = "https://www.patreon.com/c/MuscleLove?utm_source=fc2"
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 UPLOADED_LOG = "uploaded_fc2.json"
+DRY_RUN_OUTPUT = os.environ.get("DRY_RUN_OUTPUT", "dry_run_fc2_article.html")
+LOCAL_IMAGE_FILES = ["og.png"]
+LOCAL_IMAGE_DIRS = ["images"]
+URL_RE = re.compile(r"https?://[^\s<]+")
+_POOL_INSIGHTS = None
 
 # --- MuscleLove バックリンクプール（FC2はadult OKだがフィットネス系で安全運転） ---
 ML_BACKLINK_POOL_FITNESS = [
@@ -54,6 +73,78 @@ def build_backlink_block():
         )
     except Exception:
         return ""
+
+
+def env_truthy(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def load_safe_pool():
+    """Read dashboard/autonomy content_pool through the local uploader copy."""
+    global _POOL_INSIGHTS
+    if _POOL_INSIGHTS is not None:
+        return _POOL_INSIGHTS
+    if as_insights is None:
+        _POOL_INSIGHTS = {}
+        return _POOL_INSIGHTS
+    try:
+        _POOL_INSIGHTS = as_insights("safe_fitness", platform="fc2") or {}
+    except Exception as e:
+        print(f"content_pool skipped: {e}")
+        _POOL_INSIGHTS = {}
+    return _POOL_INSIGHTS
+
+
+def merge_unique(base, extra, deny=None):
+    deny = {str(x).strip().lower() for x in (deny or []) if str(x).strip()}
+    merged = []
+    seen = set()
+    for value in list(base or []) + list(extra or []):
+        text = str(value).strip()
+        key = text.lower()
+        if not text or key in seen or key in deny:
+            continue
+        seen.add(key)
+        merged.append(text)
+    return merged
+
+
+def pool_caption(tags):
+    pool = load_safe_pool()
+    templates = pool.get("recommended_templates") or []
+    if not templates:
+        return ""
+    hashtags = " ".join([f"#{t}" for t in tags[:10]])
+    template = random.choice(templates)
+    try:
+        return template.format(hashtags=hashtags, tags=hashtags)
+    except Exception:
+        return str(template)
+
+
+def linkify_text(text):
+    escaped = html.escape(str(text))
+
+    def repl(match):
+        url = match.group(0)
+        safe_url = html.escape(url, quote=True)
+        return f'<a href="{safe_url}" target="_blank" rel="noopener">{safe_url}</a>'
+
+    return URL_RE.sub(repl, escaped)
+
+
+def build_pool_cta_block():
+    pool = load_safe_pool()
+    ctas = [str(c).strip() for c in pool.get("recommended_ctas", []) if str(c).strip()]
+    if not ctas:
+        return ""
+    cta = random.choice(ctas)
+    return (
+        "\n<br/>\n"
+        "<!-- ML_CONTENT_POOL_CTA -->\n"
+        f'<p style="font-size:1.05em;">{linkify_text(cta)}</p>\n'
+        "<!-- /ML_CONTENT_POOL_CTA -->\n"
+    )
 
 # --- タグマッピング ---
 CONTENT_TAG_MAP = {
@@ -173,6 +264,9 @@ DESCRIPTION_TEMPLATES = [
 
 def download_images():
     """Google Driveからgdownで画像をダウンロード"""
+    if gdown is None:
+        print("Download error: gdown is not installed")
+        return []
     dl_dir = "images"
     os.makedirs(dl_dir, exist_ok=True)
     url = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
@@ -215,7 +309,8 @@ def generate_tags(image_name):
         if t.lower() not in seen:
             seen.add(t.lower())
             unique_tags.append(t)
-    return unique_tags
+    pool = load_safe_pool()
+    return merge_unique(unique_tags, pool.get("recommended_tags", []), pool.get("avoid_tags", []))
 
 
 def extract_category(image_name):
@@ -237,7 +332,7 @@ def build_title(image_name):
 
 def build_body(image_url, title, tags):
     """記事本文HTMLを生成"""
-    description = random.choice(DESCRIPTION_TEMPLATES)
+    description = pool_caption(tags) or random.choice(DESCRIPTION_TEMPLATES)
     hashtags = ' '.join([f'#{t}' for t in tags[:15]])
     template = random.choice(BODY_TEMPLATES)
     body = template.format(
@@ -247,7 +342,7 @@ def build_body(image_url, title, tags):
         hashtags=hashtags,
         patreon_link=PATREON_LINK,
     )
-    return body.rstrip() + build_backlink_block()
+    return body.rstrip() + build_backlink_block() + build_pool_cta_block()
 
 
 # ===== FC2 Blog XML-RPC =====
@@ -395,9 +490,83 @@ def save_uploaded_log(log):
         json.dump(log, f, indent=2, ensure_ascii=False)
 
 
+def file_url(path):
+    return "file:///" + os.path.abspath(path).replace(os.sep, "/")
+
+
+def scan_local_images():
+    images = []
+    for fname in LOCAL_IMAGE_FILES:
+        if os.path.exists(fname):
+            images.append({"name": fname, "local_path": os.path.abspath(fname)})
+    for dirname in LOCAL_IMAGE_DIRS:
+        if not os.path.isdir(dirname):
+            continue
+        for root, dirs, filenames in os.walk(dirname):
+            for fname in filenames:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in IMAGE_EXTENSIONS:
+                    path = os.path.join(root, fname)
+                    images.append({"name": fname, "local_path": os.path.abspath(path)})
+    return images
+
+
+def write_dry_run_preview(title, body, tags, image):
+    tag_line = ", ".join(tags[:20])
+    image_path = image.get("local_path", "")
+    preview = f"""<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>{html.escape(title)}</title>
+</head>
+<body>
+  <h1>{html.escape(title)}</h1>
+  <p><strong>Image:</strong> {html.escape(image_path)}</p>
+  <p><strong>Tags:</strong> {html.escape(tag_line)}</p>
+  <hr>
+{body}
+</body>
+</html>
+"""
+    with open(DRY_RUN_OUTPUT, "w", encoding="utf-8") as f:
+        f.write(preview)
+    print(f"DRY_RUN preview wrote: {DRY_RUN_OUTPUT}")
+
+
+def run_dry_run():
+    print("FC2 Blog Auto Uploader DRY_RUN")
+    print(f"Time: {datetime.now(JST).strftime('%Y-%m-%d %H:%M JST')}")
+    pool = load_safe_pool()
+    print(f"content_pool: {'loaded' if pool else 'fallback'}")
+    images = scan_local_images()
+    if not images:
+        print("No local images found for DRY_RUN")
+        return 1
+    image = sorted(images, key=lambda x: x["name"])[0]
+    tags = generate_tags(image["name"])
+    title = build_title(image["name"])
+    body = build_body(file_url(image["local_path"]), title, tags)
+    write_dry_run_preview(title, body, tags, image)
+    print(f"Selected: {image['name']}")
+    print(f"Tags: {', '.join(tags[:10])}...")
+    print("DRY_RUN complete: skipped FC2 auth, image upload, post creation, and uploaded log update.")
+    return 0
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="FC2 Blog Auto Uploader")
+    parser.add_argument("--dry-run", action="store_true", help="build a local preview without external calls")
+    return parser.parse_args()
+
+
 # ===== メイン =====
 
 def main():
+    args = parse_args()
+    if args.dry_run or env_truthy(os.environ.get("DRY_RUN")):
+        return run_dry_run()
+
     # 認証チェック
     if not FC2_BLOG_ID:
         print("Error: FC2_BLOG_ID not set")

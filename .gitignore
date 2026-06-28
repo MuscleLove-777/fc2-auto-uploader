@@ -1,6 +1,7 @@
 __pycache__/
 images/
 *.pyc
+dry_run_fc2_article.html
 .env
 venv/
 .venv/
