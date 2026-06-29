@@ -16,13 +16,14 @@ FC2_PASSWORD = os.environ.get("FC2_PASSWORD", "")
 FC2_XMLRPC_ENDPOINT = "https://blog.fc2.com/xmlrpc.php"
 
 DATE_RE = re.compile(r"\d{6,8}")
+EXT_RE = re.compile(r"\.(?:jpg|jpeg|png|webp|gif)\b", re.IGNORECASE)
 NUM_POSTS = int(os.environ.get("CLEANUP_NUM_POSTS", "30"))
 
 
 def clean_title(title):
-    """タイトル中の日付数字を 'Muscle Art' に置換し、余分な記号/空白を整える。"""
+    """タイトル中の日付数字を 'Muscle Art' に置換し、漏れた画像拡張子や余分な空白を整える。"""
     new = DATE_RE.sub("Muscle Art", title)
-    # 「の、」「の 、」のような置換漏れの不自然さは出ないが、二重空白などを軽く整形
+    new = EXT_RE.sub("", new)  # タイトルに混入した .jpg/.png 等を除去
     new = re.sub(r"\s{2,}", " ", new).strip()
     return new
 
