@@ -104,6 +104,19 @@ def main():
             print(f"post {p.get('postid')}: {meta}")
         return 0
 
+    if os.environ.get("CLEANUP_MODE") == "delete":
+        target = os.environ.get("REPUBLISH_ID", "")
+        exists = any(str(p.get("postid")) == str(target) for p in posts)
+        if not exists:
+            print(f"post {target} not found (already deleted?)")
+            return 0
+        print(f"Deleting post {target}")
+        ok = client.blogger.deletePost(
+            "", str(target), FC2_USERNAME, FC2_PASSWORD, True
+        )
+        print(f"  deletePost -> {ok}")
+        return 0
+
     if os.environ.get("CLEANUP_MODE") == "rebuild_fanza":
         target = os.environ.get("REPUBLISH_ID", "")
         import importlib.util

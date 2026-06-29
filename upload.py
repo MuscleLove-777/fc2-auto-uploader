@@ -644,19 +644,9 @@ def run_dry_run():
     title = build_title(image["name"])
     img_url = file_url(image["local_path"])
     body = build_body(img_url, title, tags)
-    # FANZAアフィリエイト記事（別記事）も合わせてプレビュー
-    fanza_title, fanza_body, fanza_tags = build_fanza_article(img_url)
-    combined_body = (
-        body
-        + '\n<hr style="border:2px dashed #ff4d6d; margin:40px 0;" />\n'
-        + '<p style="text-align:center; color:#ff4d6d;"><strong>↓↓↓ 別記事として続けて投稿される FANZAアフィリエイト記事 ↓↓↓</strong></p>\n'
-        + f'<h2>{html.escape(fanza_title)}</h2>\n'
-        + fanza_body
-    )
-    write_dry_run_preview(title, combined_body, tags, image)
+    write_dry_run_preview(title, body, tags, image)
     print(f"Selected: {image['name']}")
     print(f"Tags: {', '.join(tags[:10])}...")
-    print(f"FANZA article: {fanza_title}")
     print("DRY_RUN complete: skipped FC2 auth, image upload, post creation, and uploaded log update.")
     return 0
 
@@ -761,19 +751,9 @@ def main():
         print(f"\nSuccess! Post ID: {post_id}")
         print(f"Remaining: {len(available) - 1}")
 
-        # 4. FANZAアフィリエイト記事を別記事として続けて投稿
-        try:
-            fanza_title, fanza_body, fanza_tags = build_fanza_article(image_url)
-            print(f"\nFANZA affiliate post: {fanza_title}")
-            fanza_post_id = create_blog_post(
-                client, fanza_title, fanza_body, fanza_tags,
-                publish=True, categories=['FANZA'],
-            )
-            print(f"FANZA post created! ID: {fanza_post_id}")
-        except xmlrpc.client.Fault as e:
-            print(f"FANZA post XML-RPC error (main post OK): {e.faultCode} - {e.faultString}")
-        except Exception as e:
-            print(f"FANZA post failed (main post OK): {e}")
+        # NOTE: FC2はal.dmm.co.jp等のFANZAアフィリ直リンクを含む記事を非公開化するため、
+        # FC2ではFANZAアフィリ記事の自動投稿は行わない(ユーザー判断 2026-06-30)。
+        # FANZAはアフィリ承認済みのLivedoor等で運用する。build_fanza_article等は他用途に保持。
 
         return 0
 
