@@ -111,9 +111,16 @@ def main():
             if str(p.get("postid")) != str(target):
                 continue
             raw_body = fully_unescape(p.get("description", ""))
+            body_out = clean_body(raw_body)
+            if os.environ.get("REPUBLISH_STRIP_FANZA") == "1":
+                # al.dmm.co.jp を含む div ブロックを丸ごと除去（FC2非公開化の原因切り分け）
+                body_out = re.sub(
+                    r"<div[^>]*>(?:(?!</div>).)*al\.dmm\.co\.jp(?:(?!</div>).)*</div>",
+                    "", body_out, flags=re.DOTALL,
+                )
             struct = {
                 "title": clean_title(p.get("title", "")),
-                "description": clean_body(raw_body),
+                "description": body_out,
                 "categories": [new_cat] if new_cat else [],
                 "mt_keywords": p.get("mt_keywords", ""),
             }

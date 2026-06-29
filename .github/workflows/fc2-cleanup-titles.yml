@@ -11,6 +11,10 @@ on:
         description: "republishモード時の対象post id"
         required: false
         default: ""
+      strip_fanza:
+        description: "1ならFANZAアフィリブロックを除去して再公開(原因切り分け)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -34,4 +38,5 @@ jobs:
           FC2_PASSWORD: ${{ secrets.FC2_PASSWORD }}
           CLEANUP_MODE: ${{ inputs.mode }}
           REPUBLISH_ID: ${{ inputs.republish_id }}
+          REPUBLISH_STRIP_FANZA: ${{ inputs.strip_fanza }}
         run: python cleanup_titles.py
