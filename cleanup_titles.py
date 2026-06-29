@@ -41,7 +41,7 @@ def main():
     for p in posts:
         title = p.get("title", "")
         post_id = p.get("postid", "")
-        if not DATE_RE.search(title):
+        if not (DATE_RE.search(title) or EXT_RE.search(title)):
             continue
         new_title = clean_title(title)
         if new_title == title:
