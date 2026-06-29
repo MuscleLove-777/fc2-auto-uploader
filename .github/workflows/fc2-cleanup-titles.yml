@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "dump=本文確認 / meta=メタ情報 / 空=実際に修正"
+        description: "dump=本文確認 / meta=メタ情報 / republish=再公開 / 空=実際に修正"
+        required: false
+        default: ""
+      republish_id:
+        description: "republishモード時の対象post id"
         required: false
         default: ""
 
@@ -29,4 +33,5 @@ jobs:
           FC2_USERNAME: ${{ secrets.FC2_USERNAME }}
           FC2_PASSWORD: ${{ secrets.FC2_PASSWORD }}
           CLEANUP_MODE: ${{ inputs.mode }}
+          REPUBLISH_ID: ${{ inputs.republish_id }}
         run: python cleanup_titles.py

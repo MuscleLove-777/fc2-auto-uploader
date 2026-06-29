@@ -104,6 +104,28 @@ def main():
             print(f"post {p.get('postid')}: {meta}")
         return 0
 
+    if os.environ.get("CLEANUP_MODE") == "republish":
+        target = os.environ.get("REPUBLISH_ID", "")
+        new_cat = os.environ.get("REPUBLISH_CATEGORY", "筋肉女子")
+        for p in posts:
+            if str(p.get("postid")) != str(target):
+                continue
+            raw_body = fully_unescape(p.get("description", ""))
+            struct = {
+                "title": clean_title(p.get("title", "")),
+                "description": clean_body(raw_body),
+                "categories": [new_cat] if new_cat else [],
+                "mt_keywords": p.get("mt_keywords", ""),
+            }
+            print(f"Republishing post {target} with category={new_cat!r}")
+            ok = client.metaWeblog.editPost(
+                str(target), FC2_USERNAME, FC2_PASSWORD, struct, True
+            )
+            print(f"  editPost -> {ok}")
+            return 0
+        print(f"post {target} not found")
+        return 1
+
     fixed = 0
     for p in posts:
         title = p.get("title", "")
