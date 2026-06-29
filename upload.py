@@ -356,12 +356,17 @@ def generate_tags(image_name):
 
 
 def extract_category(image_name):
-    """ファイル名からカテゴリを推定"""
-    parts = image_name.replace('-', ' ').replace('_', ' ').split()
+    """ファイル名からカテゴリを推定（日付・連番などの数字トークンは除外）"""
+    name = os.path.splitext(image_name)[0]  # 拡張子を除去
+    parts = name.replace('-', ' ').replace('_', ' ').split()
     skip = {'jpg', 'jpeg', 'png', 'webp', 'gif'}
     for p in parts:
-        if p.lower() not in skip and len(p) > 2:
-            return p.capitalize()
+        if p.lower() in skip or len(p) <= 2:
+            continue
+        # 240614 のような日付・数字のみのトークンはタイトルに出さない
+        if re.fullmatch(r'\d+', p):
+            continue
+        return p.capitalize()
     return "Muscle Art"
 
 
