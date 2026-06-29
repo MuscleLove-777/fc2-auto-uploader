@@ -2,6 +2,11 @@ name: FC2 Cleanup Titles (one-shot)
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "dump=本文確認のみ / 空=実際に修正"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -23,4 +28,5 @@ jobs:
           FC2_BLOG_ID: ${{ secrets.FC2_BLOG_ID }}
           FC2_USERNAME: ${{ secrets.FC2_USERNAME }}
           FC2_PASSWORD: ${{ secrets.FC2_PASSWORD }}
+          CLEANUP_MODE: ${{ inputs.mode }}
         run: python cleanup_titles.py

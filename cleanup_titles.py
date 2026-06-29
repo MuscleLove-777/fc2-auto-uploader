@@ -37,6 +37,14 @@ def main():
         FC2_BLOG_ID, FC2_USERNAME, FC2_PASSWORD, NUM_POSTS
     )
     print(f"Fetched {len(posts)} recent posts")
+
+    if os.environ.get("CLEANUP_MODE") == "dump":
+        for p in posts[:6]:
+            desc = p.get("description", "")
+            print(f"--- post {p.get('postid')} title={p.get('title')!r}")
+            print(f"    has_&lt;={'&lt;' in desc}  has_raw_<p={'<p' in desc or '<div' in desc}")
+            print(f"    head: {desc[:160]!r}")
+        return 0
     fixed = 0
     for p in posts:
         title = p.get("title", "")
