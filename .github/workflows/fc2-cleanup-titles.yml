@@ -15,6 +15,10 @@ on:
         description: "1ならFANZAアフィリブロックを除去して再公開(原因切り分け)"
         required: false
         default: ""
+      image_url:
+        description: "rebuild_fanza時に本文へ使う画像URL"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -39,4 +43,5 @@ jobs:
           CLEANUP_MODE: ${{ inputs.mode }}
           REPUBLISH_ID: ${{ inputs.republish_id }}
           REPUBLISH_STRIP_FANZA: ${{ inputs.strip_fanza }}
+          REPUBLISH_IMAGE: ${{ inputs.image_url }}
         run: python cleanup_titles.py

@@ -114,8 +114,8 @@ def main():
             if str(p.get("postid")) != str(target):
                 continue
             raw = fully_unescape(p.get("description", ""))
-            m_img = re.search(r'<img[^>]*src="([^"]+)"', raw)
-            image_url = m_img.group(1) if m_img else ""
+            m_img = re.search(r'<img[^>]+src="([^"]+)"', raw)
+            image_url = os.environ.get("REPUBLISH_IMAGE", "") or (m_img.group(1) if m_img else "")
             title = p.get("title", "") or "🔞 筋肉女子の腹筋がエグい作品まとめ｜FANZA厳選"
             _, body, _ = up.build_fanza_article(image_url, title=title)
             struct = {
