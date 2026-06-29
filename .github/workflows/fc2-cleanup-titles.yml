@@ -1,0 +1,26 @@
+name: FC2 Cleanup Titles (one-shot)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run cleanup
+        env:
+          FC2_BLOG_ID: ${{ secrets.FC2_BLOG_ID }}
+          FC2_USERNAME: ${{ secrets.FC2_USERNAME }}
+          FC2_PASSWORD: ${{ secrets.FC2_PASSWORD }}
+        run: python cleanup_titles.py
