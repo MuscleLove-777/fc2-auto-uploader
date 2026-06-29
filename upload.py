@@ -48,20 +48,24 @@ FC2_XMLRPC_ENDPOINT = "https://blog.fc2.com/xmlrpc.php"
 PATREON_LINK = "https://www.patreon.com/c/MuscleLove?utm_source=fc2"
 X_LINK = "https://x.com/MuscleGirlLove7"
 
-# --- FANZA(DMM)アフィリエイト（af_id: pinky2400-003 / al.dmm.co.jp 経由で成果計測） ---
+# --- FANZA(DMM)アフィリエイト ---
+# 重要: FC2は本文に al.dmm.co.jp(FANZAアフィリ直リンク)を含む記事を自動で非公開化(404)する。
+# そのため記事面では自サイトハブ(musclelove-777.github.io)へ誘導し、FANZAアフィリ計測は
+# ハブ側で行う(コンプライアンス安全・FC2で表示可能)。af_id/直リンクは参照用に保持。
 FANZA_AF_ID = "pinky2400-003"
-# リンク先 = FANZAで「腹筋」検索結果（腹筋が際立つ作品が並ぶ。MuscleLoveの筋肉女子テーマと合致）
 FANZA_LINK = (
     "https://al.dmm.co.jp/?lurl=https%3A%2F%2Fvideo.dmm.co.jp%2Fav%2Flist%2F%3Fkeyword%3D%E8%85%B9%E7%AD%8B"
     f"&af_id={FANZA_AF_ID}&ch=link_tool&ch_id=text"
 )
-# 記事下部に差し込むFANZA CTAカード（PR表記=ステマ規制対応 / 18禁注記付き / rel=sponsored）
+# 記事面の誘導先 = 自サイトのFANZA作品ガイドハブ（adult_fanzaレーンのpriority_url）
+FANZA_FUNNEL_URL = "https://musclelove-777.github.io/?utm_source=fc2&utm_medium=fanza"
+# 記事下部に差し込むFANZA誘導カード（PR表記=ステマ規制対応 / 18禁注記付き）
 FANZA_BLOCK_HTML = (
     '<div style="text-align:center; background:#2a0a12; padding:20px; border-radius:10px; margin:20px 0;">'
-    '<p style="font-size:1.25em; color:#ff4d6d;">🔞 筋肉×腹筋が際立つ作品をもっと見たい人へ</p>'
-    f'<p style="font-size:1.1em;"><a href="{FANZA_LINK}" target="_blank" rel="noopener nofollow sponsored" '
-    'style="color:#ff8fa3; text-decoration:underline;">👉 FANZAで腹筋エグい作品をチェック 👈</a></p>'
-    '<p style="font-size:0.8em; color:#999;">※18歳未満は閲覧不可 ／ PR（アフィリエイト広告）</p>'
+    '<p style="font-size:1.25em; color:#ff4d6d;">🔞 筋肉×腹筋が際立つFANZA作品をもっと見たい人へ</p>'
+    f'<p style="font-size:1.1em;"><a href="{FANZA_FUNNEL_URL}" target="_blank" rel="noopener" '
+    'style="color:#ff8fa3; text-decoration:underline;">👉 FANZA作品ガイド・ランキングはこちら 👈</a></p>'
+    '<p style="font-size:0.8em; color:#999;">※18歳未満は閲覧不可 ／ PR</p>'
     '</div>'
 )
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}

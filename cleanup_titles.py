@@ -104,6 +104,35 @@ def main():
             print(f"post {p.get('postid')}: {meta}")
         return 0
 
+    if os.environ.get("CLEANUP_MODE") == "rebuild_fanza":
+        target = os.environ.get("REPUBLISH_ID", "")
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("upload", "upload.py")
+        up = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(up)
+        for p in posts:
+            if str(p.get("postid")) != str(target):
+                continue
+            raw = fully_unescape(p.get("description", ""))
+            m_img = re.search(r'<img[^>]*src="([^"]+)"', raw)
+            image_url = m_img.group(1) if m_img else ""
+            title = p.get("title", "") or "🔞 筋肉女子の腹筋がエグい作品まとめ｜FANZA厳選"
+            _, body, _ = up.build_fanza_article(image_url, title=title)
+            struct = {
+                "title": title,
+                "description": body,
+                "categories": ["筋肉女子"],
+                "mt_keywords": p.get("mt_keywords", ""),
+            }
+            print(f"Rebuilding FANZA post {target} (image={image_url[:60]!r})")
+            ok = client.metaWeblog.editPost(
+                str(target), FC2_USERNAME, FC2_PASSWORD, struct, True
+            )
+            print(f"  editPost -> {ok}")
+            return 0
+        print(f"post {target} not found")
+        return 1
+
     if os.environ.get("CLEANUP_MODE") == "republish":
         target = os.environ.get("REPUBLISH_ID", "")
         new_cat = os.environ.get("REPUBLISH_CATEGORY", "筋肉女子")

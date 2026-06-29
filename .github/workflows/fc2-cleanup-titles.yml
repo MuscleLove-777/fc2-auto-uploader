@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "dump=本文確認 / meta=メタ情報 / republish=再公開 / 空=実際に修正"
+        description: "dump / meta / republish / rebuild_fanza / 空=修正"
         required: false
         default: ""
       republish_id:
