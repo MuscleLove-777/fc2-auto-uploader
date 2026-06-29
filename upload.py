@@ -18,6 +18,13 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
+# Windowsローカル(cp932)でも絵文字ログでクラッシュしないようUTF-8出力に統一
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 try:
     import gdown
 except ImportError:
@@ -33,10 +40,30 @@ JST = timezone(timedelta(hours=9))
 FC2_BLOG_ID = os.environ.get("FC2_BLOG_ID", "")
 FC2_USERNAME = os.environ.get("FC2_USERNAME", "")
 FC2_PASSWORD = os.environ.get("FC2_PASSWORD", "")
-GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID_FC2", "")
+# 画像取得元: DeviantArtと同じDriveフォルダを使う（GDRIVE_FOLDER_ID）。
+# 旧 GDRIVE_FOLDER_ID_FC2 が設定済みの環境向けに後方互換でフォールバック。
+GDRIVE_FOLDER_ID = os.environ.get("GDRIVE_FOLDER_ID", "") or os.environ.get("GDRIVE_FOLDER_ID_FC2", "")
 
 FC2_XMLRPC_ENDPOINT = "https://blog.fc2.com/xmlrpc.php"
 PATREON_LINK = "https://www.patreon.com/c/MuscleLove?utm_source=fc2"
+X_LINK = "https://x.com/MuscleGirlLove7"
+
+# --- FANZA(DMM)アフィリエイト（af_id: pinky2400-003 / al.dmm.co.jp 経由で成果計測） ---
+FANZA_AF_ID = "pinky2400-003"
+# リンク先 = FANZAで「腹筋」検索結果（腹筋が際立つ作品が並ぶ。MuscleLoveの筋肉女子テーマと合致）
+FANZA_LINK = (
+    "https://al.dmm.co.jp/?lurl=https%3A%2F%2Fvideo.dmm.co.jp%2Fav%2Flist%2F%3Fkeyword%3D%E8%85%B9%E7%AD%8B"
+    f"&af_id={FANZA_AF_ID}&ch=link_tool&ch_id=text"
+)
+# 記事下部に差し込むFANZA CTAカード（PR表記=ステマ規制対応 / 18禁注記付き / rel=sponsored）
+FANZA_BLOCK_HTML = (
+    '<div style="text-align:center; background:#2a0a12; padding:20px; border-radius:10px; margin:20px 0;">'
+    '<p style="font-size:1.25em; color:#ff4d6d;">🔞 筋肉×腹筋が際立つ作品をもっと見たい人へ</p>'
+    f'<p style="font-size:1.1em;"><a href="{FANZA_LINK}" target="_blank" rel="noopener nofollow sponsored" '
+    'style="color:#ff8fa3; text-decoration:underline;">👉 FANZAで腹筋エグい作品をチェック 👈</a></p>'
+    '<p style="font-size:0.8em; color:#999;">※18歳未満は閲覧不可 ／ PR（アフィリエイト広告）</p>'
+    '</div>'
+)
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 UPLOADED_LOG = "uploaded_fc2.json"
 DRY_RUN_OUTPUT = os.environ.get("DRY_RUN_OUTPUT", "dry_run_fc2_article.html")
@@ -57,6 +84,17 @@ ML_BACKLINK_POOL_FITNESS = [
     ("https://musclelove-777.github.io/network/fitness/", "Fitness Network 15サイト"),
     ("https://musclelove-777.github.io/network/academy/", "MuscleLove Academy 77"),
 ]
+
+
+def build_x_block():
+    """X(旧Twitter)へのリンクブロック（全記事に付与、冪等マーカー付き）"""
+    return (
+        "\n<br/>\n"
+        "<!-- ML_X_LINK -->\n"
+        f'<p style="font-size:1.1em;">🐦 <a href="{X_LINK}" target="_blank" rel="noopener">'
+        'X（旧Twitter）でもほぼ毎日更新中！ → @MuscleGirlLove7</a></p>\n'
+        "<!-- /ML_X_LINK -->\n"
+    )
 
 
 def build_backlink_block():
@@ -342,7 +380,52 @@ def build_body(image_url, title, tags):
         hashtags=hashtags,
         patreon_link=PATREON_LINK,
     )
-    return body.rstrip() + build_backlink_block() + build_pool_cta_block()
+    return body.rstrip() + build_x_block() + build_backlink_block() + build_pool_cta_block()
+
+
+# ===== FANZA アフィリエイト記事 =====
+
+FANZA_TITLE_TEMPLATES = [
+    "🔞 筋肉女子の腹筋がエグい作品まとめ｜FANZA厳選",
+    "🔞 バキバキ腹筋×美女。FANZAで見つけた神作品",
+    "🔞 筋肉美女好きが選ぶFANZAおすすめ作品",
+    "🔞 腹筋フェチ必見。FANZAの仕上がりエグい作品",
+    "🔞 アスリート系美女作品をFANZAでチェック",
+]
+
+FANZA_INTRO_TEMPLATES = [
+    "MuscleLoveがお届けする筋肉女子の世界。さらに刺激が欲しい大人の方には、FANZAの腹筋エグい作品もおすすめです。",
+    "バキバキに鍛えられた腹筋と、しなやかな筋肉美。もっとディープに楽しみたい方はFANZAでどうぞ。",
+    "筋肉×美しさの究極系。下のリンクから、FANZAで腹筋が際立つ作品をチェックできます。",
+]
+
+
+def build_fanza_article(image_url, title=None):
+    """FANZAアフィリエイト用の独立記事（タイトル・本文・タグ）を生成。
+
+    メイン記事と同じ画像URLを再利用して視覚的に繋げつつ、FANZA CTA・Patreon・Xを付与する。
+    """
+    fanza_title = title or random.choice(FANZA_TITLE_TEMPLATES)
+    intro = random.choice(FANZA_INTRO_TEMPLATES)
+    img_html = (
+        f'<p><img src="{image_url}" alt="{fanza_title}" style="max-width:100%;" /></p>\n'
+        if image_url else ""
+    )
+    body = (
+        '<div style="text-align:center;">\n'
+        f'{img_html}'
+        f'<p style="font-size:1.1em;"><strong>{fanza_title}</strong></p>\n'
+        f'<p>{intro}</p>\n'
+        f'{FANZA_BLOCK_HTML}\n'
+        '<hr />\n'
+        f'<p style="font-size:1.1em;">🔥 <a href="{PATREON_LINK}" target="_blank">'
+        '<strong>未公開コンテンツはPatreonへ → MuscleLove</strong></a></p>\n'
+        '</div>'
+    )
+    body = body.rstrip() + build_x_block() + build_backlink_block()
+    # FANZA記事のタグ（adult寄り。ベースは筋肉女子テーマ）
+    tags = ['筋肉美女', 'マッスル', '腹筋女子', 'FANZA', 'アスリート系', 'AI美女', 'MuscleLove']
+    return fanza_title, body, tags
 
 
 # ===== FC2 Blog XML-RPC =====
@@ -458,12 +541,12 @@ def upload_image_to_fc2(client, image_path):
     return image_url
 
 
-def create_blog_post(client, title, body, tags, publish=True):
+def create_blog_post(client, title, body, tags, publish=True, categories=None):
     """FC2 Blogに記事を投稿"""
     post_struct = {
         'title': title,
         'description': body,
-        'categories': ['筋肉女子'],
+        'categories': categories or ['筋肉女子'],
         'mt_keywords': ','.join(tags[:20]),
     }
 
@@ -546,10 +629,21 @@ def run_dry_run():
     image = sorted(images, key=lambda x: x["name"])[0]
     tags = generate_tags(image["name"])
     title = build_title(image["name"])
-    body = build_body(file_url(image["local_path"]), title, tags)
-    write_dry_run_preview(title, body, tags, image)
+    img_url = file_url(image["local_path"])
+    body = build_body(img_url, title, tags)
+    # FANZAアフィリエイト記事（別記事）も合わせてプレビュー
+    fanza_title, fanza_body, fanza_tags = build_fanza_article(img_url)
+    combined_body = (
+        body
+        + '\n<hr style="border:2px dashed #ff4d6d; margin:40px 0;" />\n'
+        + '<p style="text-align:center; color:#ff4d6d;"><strong>↓↓↓ 別記事として続けて投稿される FANZAアフィリエイト記事 ↓↓↓</strong></p>\n'
+        + f'<h2>{html.escape(fanza_title)}</h2>\n'
+        + fanza_body
+    )
+    write_dry_run_preview(title, combined_body, tags, image)
     print(f"Selected: {image['name']}")
     print(f"Tags: {', '.join(tags[:10])}...")
+    print(f"FANZA article: {fanza_title}")
     print("DRY_RUN complete: skipped FC2 auth, image upload, post creation, and uploaded log update.")
     return 0
 
@@ -578,7 +672,7 @@ def main():
         print("Error: FC2_PASSWORD not set")
         return 1
     if not GDRIVE_FOLDER_ID:
-        print("Error: GDRIVE_FOLDER_ID_FC2 not set")
+        print("Error: GDRIVE_FOLDER_ID not set (DeviantArtと同じDriveフォルダIDを設定。旧GDRIVE_FOLDER_ID_FC2も可)")
         return 1
 
     print("FC2 Blog Auto Uploader (XML-RPC)")
@@ -653,6 +747,21 @@ def main():
         save_uploaded_log(uploaded_log)
         print(f"\nSuccess! Post ID: {post_id}")
         print(f"Remaining: {len(available) - 1}")
+
+        # 4. FANZAアフィリエイト記事を別記事として続けて投稿
+        try:
+            fanza_title, fanza_body, fanza_tags = build_fanza_article(image_url)
+            print(f"\nFANZA affiliate post: {fanza_title}")
+            fanza_post_id = create_blog_post(
+                client, fanza_title, fanza_body, fanza_tags,
+                publish=True, categories=['FANZA'],
+            )
+            print(f"FANZA post created! ID: {fanza_post_id}")
+        except xmlrpc.client.Fault as e:
+            print(f"FANZA post XML-RPC error (main post OK): {e.faultCode} - {e.faultString}")
+        except Exception as e:
+            print(f"FANZA post failed (main post OK): {e}")
+
         return 0
 
     except xmlrpc.client.Fault as e:
