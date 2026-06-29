@@ -98,6 +98,12 @@ def main():
             print(f"    corrupted={is_corrupted(desc)}  head={desc[:120]!r}")
         return 0
 
+    if os.environ.get("CLEANUP_MODE") == "meta":
+        for p in posts:
+            meta = {k: v for k, v in p.items() if k != "description"}
+            print(f"post {p.get('postid')}: {meta}")
+        return 0
+
     fixed = 0
     for p in posts:
         title = p.get("title", "")

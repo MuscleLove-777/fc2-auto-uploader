@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "dump=本文確認のみ / 空=実際に修正"
+        description: "dump=本文確認 / meta=メタ情報 / 空=実際に修正"
         required: false
         default: ""
 
