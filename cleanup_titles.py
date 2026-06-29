@@ -26,9 +26,21 @@ FC2_PASSWORD = os.environ.get("FC2_PASSWORD", "")
 FC2_XMLRPC_ENDPOINT = "https://blog.fc2.com/xmlrpc.php"
 
 DATE_RE = re.compile(r"\d{6,8}")
+# 日付(全数字)やファイル名ハッシュ(英数字)などの「ゴミID」トークン
+JUNK_RE = re.compile(r"[0-9a-fA-F]{6,8}")
 EXT_RE = re.compile(r"\.(?:jpg|jpeg|png|webp|gif)\b", re.IGNORECASE)
+
+
+def _junk_sub(m):
+    tok = m.group(0)
+    digits = sum(c.isdigit() for c in tok)
+    # 全数字(=日付/連番) か、全hex文字かつ数字2個以上(=ハッシュ片)のみ置換
+    if tok.isdigit() or digits >= 2:
+        return "Muscle Art"
+    return tok
 ENTITY_RE = re.compile(r"&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);")
-URL_ATTR_RE = re.compile(r'(?:src|href)="[^"]*"')
+# 本文置換時に保護する全HTML属性値(style内の#色コードやsrc/hrefのURL等を守る)
+ATTR_RE = re.compile(r'[\w-]+="[^"]*"')
 NUM_POSTS = int(os.environ.get("CLEANUP_NUM_POSTS", "30"))
 
 
@@ -48,22 +60,22 @@ def is_corrupted(rep):
 
 
 def clean_title(title):
-    new = DATE_RE.sub("Muscle Art", title)
+    new = JUNK_RE.sub(_junk_sub, title)
     new = EXT_RE.sub("", new)
     new = re.sub(r"\s{2,}", " ", new).strip()
     return new
 
 
 def clean_body(body):
-    """src/href のURLを保護したうえで、本文テキスト中の日付を 'Muscle Art' に置換。"""
+    """全HTML属性値(style内の色コードやURL)を保護し、本文テキスト中のゴミIDのみ置換。"""
     stash = []
 
     def _stash(m):
         stash.append(m.group(0))
         return f"\x00{len(stash) - 1}\x00"
 
-    tmp = URL_ATTR_RE.sub(_stash, body)
-    tmp = DATE_RE.sub("Muscle Art", tmp)
+    tmp = ATTR_RE.sub(_stash, body)
+    tmp = JUNK_RE.sub(_junk_sub, tmp)
     for i, v in enumerate(stash):
         tmp = tmp.replace(f"\x00{i}\x00", v)
     return tmp
