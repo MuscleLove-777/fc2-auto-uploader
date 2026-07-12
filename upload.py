@@ -700,8 +700,13 @@ def main():
     uploaded_names = set(uploaded_log)
     available = [img for img in images if img["name"] not in uploaded_names]
     if not available:
-        print("All images already uploaded!")
-        return 0
+        # 画像プールを1周し切ったらログをリセットして再利用（周回投稿）。
+        # これで新規画像が無くても投稿が止まらない。
+        print("All images already uploaded! Resetting log to reuse images (cyclic).")
+        uploaded_log = []
+        uploaded_names = set()
+        save_uploaded_log(uploaded_log)
+        available = list(images)
 
     print(f"Available: {len(available)} / Total: {len(images)}")
 
