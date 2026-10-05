@@ -1,0 +1,55 @@
+name: Cloud Uploader Self Monitor Retry
+on:
+  workflow_run:
+    workflows: [Cloud Uploader Daily Self Monitor]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Failed primary monitor run ID to inspect
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: daily-cloud-uploader-monitor-retry
+  queue: max
+jobs:
+  retry:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(fromJSON('["failure","cancelled","timed_out"]'), github.event.workflow_run.conclusion) }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Confirm primary never acquired a runner
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ github.event.inputs.source_run_id || github.event.workflow_run.id }}
+        run: python cloud_monitor_retry.py
+      - name: Run one backup self-audit
+        if: steps.gate.outputs.retry == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python cloud_workflow_guard.py
+      - name: Preserve backup observation
+        if: always() && steps.gate.outputs.retry == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -f cloud_guard_latest.json
+          git diff --cached --quiet || git commit -m 'auto: backup publisher health [skip ci]'
+          git pull --rebase --autostash
+          git push
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.gate.outputs.retry == 'true'
+        with:
+          name: cloud-uploader-backup-health
+          path: cloud_guard_latest.json
+          retention-days: 30
