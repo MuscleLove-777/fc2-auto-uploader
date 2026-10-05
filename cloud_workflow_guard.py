@@ -50,6 +50,9 @@ def main():
                 row["issues"].append("publisher_has_no_runs")
             elif latest["conclusion"] in {"failure", "timed_out", "cancelled", "action_required"}:
                 row["issues"].append("publisher_failed")
+            elif latest["status"] != "completed" and datetime.fromisoformat(
+                    latest["created_at"].replace("Z", "+00:00")) < now - timedelta(hours=2):
+                row["issues"].append("publisher_run_over_2h")
             elif datetime.fromisoformat(latest["created_at"].replace("Z", "+00:00")) < now - timedelta(hours=48):
                 row["issues"].append("publisher_stale_48h")
         except Exception as error:
