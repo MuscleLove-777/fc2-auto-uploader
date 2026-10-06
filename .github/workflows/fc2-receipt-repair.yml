@@ -1,0 +1,34 @@
+name: FC2 Published Receipt Repair
+on:
+  workflow_run:
+    workflows: [FC2 Blog Auto Post]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Failed publisher run ID to inspect
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: fc2-receipt-repair
+  queue: max
+jobs:
+  reconcile:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reconcile proven published post without reposting
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ github.event.inputs.source_run_id || github.event.workflow_run.id }}
+        run: python fc2_receipt_repair.py
