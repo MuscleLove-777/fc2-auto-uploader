@@ -3,6 +3,8 @@
 FC2 Blog 画像自動アップロード（GitHub Actions用）
 Google Driveから画像取得 → FC2 BlogにXML-RPC (MetaWeblog API) で投稿
 """
+from publication_evidence import record_publication_result, identity_from_url
+from promotion_policy import CANONICAL_URL, canonical_cta, strip_plain_promotion, normalize_plain_promotion, normalize_html_promotion
 import argparse
 import html
 import sys
@@ -369,7 +371,7 @@ def build_body(image_url, title, tags):
         hashtags=hashtags,
         patreon_link=PATREON_LINK,
     )
-    return body.rstrip() + build_x_block() + build_backlink_block() + build_pool_cta_block()
+    return normalize_html_promotion(body.rstrip() + build_x_block() + build_backlink_block() + build_pool_cta_block())
 
 
 # ===== FANZA アフィリエイト記事 =====
@@ -414,7 +416,7 @@ def build_fanza_article(image_url, title=None):
     body = body.rstrip() + build_x_block() + build_backlink_block()
     # FANZA記事のタグ（adult寄り。ベースは筋肉女子テーマ）
     tags = ['筋肉美女', 'マッスル', '腹筋女子', 'FANZA', 'アスリート系', 'AI美女', 'MuscleLove']
-    return fanza_title, body, tags
+    return fanza_title, normalize_html_promotion(body), tags
 
 
 # ===== FC2 Blog XML-RPC =====
@@ -544,6 +546,8 @@ def create_blog_post(client, title, body, tags, publish=True, categories=None):
         client.metaWeblog.newPost,
         FC2_BLOG_ID, FC2_USERNAME, FC2_PASSWORD, post_struct, publish
     )
+    if publish and post_id:
+        record_publication_result("fc2", {"title": title, "caption": body}, post_id=post_id, confirmed=True)
     print(f"Post created! ID: {post_id}")
     return post_id
 
@@ -668,8 +672,8 @@ def main():
     # Google Driveから画像ダウンロード
     images = download_images()
     if not images:
-        print("No images found!")
-        return 0
+        print("HOLD: image acquisition produced no usable images; no post was attempted.")
+        return 3
 
     # 未アップロード画像をフィルタ
     uploaded_log = load_uploaded_log()
