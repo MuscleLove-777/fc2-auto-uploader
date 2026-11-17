@@ -102,42 +102,8 @@ jobs:
             echo "attempts=3" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: LINE notify on failure
+      # 2026-11-17: no push notifications (owner rule). A run whose attempts all failed
+      # now fails the job itself, so the Actions status and the daily checks show it.
+      - name: Fail the job when every attempt failed
         if: steps.result.outputs.success == 'false'
-        env:
-          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-        run: |
-          curl -s -X POST https://api.line.me/v2/bot/message/push \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${LINE_CHANNEL_TOKEN}" \
-            -d "{
-              \"to\": \"${LINE_USER_ID}\",
-              \"messages\": [{
-                \"type\": \"text\",
-                \"text\": \"⚠️ FC2ブログ自動投稿が3回リトライしても失敗しました\n\n時刻: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')\nログ: https://github.com/MuscleLove-777/fc2-auto-uploader/actions/runs/${{ github.run_id }}\"
-              }]
-            }"
-
-      - name: LINE notify on success
-        if: steps.result.outputs.success == 'true'
-        env:
-          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-        run: |
-          ATTEMPTS=${{ steps.result.outputs.attempts }}
-          if [ "$ATTEMPTS" = "1" ]; then
-            RETRY_INFO="（1回目で成功）"
-          else
-            RETRY_INFO="（${ATTEMPTS}回目のリトライで成功）"
-          fi
-          curl -s -X POST https://api.line.me/v2/bot/message/push \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${LINE_CHANNEL_TOKEN}" \
-            -d "{
-              \"to\": \"${LINE_USER_ID}\",
-              \"messages\": [{
-                \"type\": \"text\",
-                \"text\": \"✅ FC2ブログ自動投稿が完了しました${RETRY_INFO}\n\n時刻: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')\nログ: https://github.com/MuscleLove-777/fc2-auto-uploader/actions/runs/${{ github.run_id }}\"
-              }]
-            }"
+        run: exit 1
